@@ -1,58 +1,71 @@
-name: Build Windows EXE
+name: 生产下单系统构建
 
+# 触发条件
 on:
   push:
+    branches: [ main, master ]
+  pull_request:
     branches: [ main ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:  # 重要：允许手动运行
 
+# 环境变量
+env:
+  PYTHON_VERSION: '3.9'
+
+# 构建任务
 jobs:
-  build:
+  build-windows-exe:
+    name: 构建Windows EXE
     runs-on: windows-latest
     
     steps:
-    - name: 检出代码
-      uses: actions/checkout@v3
-      
-    - name: 设置Python环境
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        
-    - name: 安装依赖
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: 打包EXE文件
-      run: |
-        pyinstaller --onefile --windowed --name "生产下单系统" --add-data "templates;templates" app.py
-        
-    - name: 创建便携版包
-      run: |
-        mkdir -p 发布包
-        copy dist\生产下单系统.exe 发布包\
-        xcopy templates 发布包\templates\ /E /I
-        
-        # 创建启动脚本
-        echo @echo off > 发布包\启动系统.bat
-        echo echo 正在启动生产下单系统... >> 发布包\启动系统.bat
-        echo echo 首次启动可能需要10-20秒，请耐心等待... >> 发布包\启动系统.bat
-        echo echo 启动后请在浏览器访问: http://localhost:5000 >> 发布包\启动系统.bat
-        echo echo. >> 发布包\启动系统.bat
-        echo 生产下单系统.exe >> 发布包\启动系统.bat
-        echo pause >> 发布包\启动系统.bat
-        
-    - name: 上传构建产物
-      uses: actions/upload-artifact@v3
-      with:
-        name: 生产下单系统-发布包
-        path: 发布包/
-        
-    - name: 生成下载链接
-      run: |
-        echo "EXE文件构建成功！" >> $GITHUB_STEP_SUMMARY
-        echo "请在右侧 Artifacts 处下载" >> $GITHUB_STEP_SUMMARY
-        echo "文件包含：" >> $GITHUB_STEP_SUMMARY
-        echo "- 生产下单系统.exe" >> $GITHUB_STEP_SUMMARY
-        echo "- templates文件夹" >> $GITHUB_STEP_SUMMARY
-        echo "- 启动系统.bat" >> $GITHUB_STEP_SUMMARY
+      # 步骤1：检出代码
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      # 步骤2：设置Python
+      - name: 设置Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      # 步骤3：验证文件
+      - name: 验证必要文件
+        run: |
+          if not exist "app.py" (
+            echo "错误：缺少 app.py"
+            exit 1
+          )
+          echo "✅ 文件验证通过"
+          
+      # 步骤4：安装依赖
+      - name: 安装依赖包
+        run: |
+          python -m pip install --upgrade pip
+          pip install flask==2.3.0 pyinstaller==5.13.0
+          
+      # 步骤5：打包EXE
+      - name: 生成可执行文件
+        run: |
+          pyinstaller ^
+            --onefile ^
+            --name "ProductionOrderSystem" ^
+            --clean ^
+            app.py
+          
+      # 步骤6：上传构建产物
+      - name: 上传EXE文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: Production-Order-System
+          path: dist/ProductionOrderSystem.exe
+          retention-days: 7
+          
+      # 步骤7：完成通知
+      - name: 构建完成
+        run: |
+          echo "🎉 EXE文件构建成功！" >> $GITHUB_STEP_SUMMARY
+          echo "文件位置：dist/ProductionOrderSystem.exe" >> $GITHUB_STEP_SUMMARY
+          echo "大小：$((Get-Item 'dist/ProductionOrderSystem.exe').Length / 1MB) MB" >> $GITHUB_STEP_SUMMARY
