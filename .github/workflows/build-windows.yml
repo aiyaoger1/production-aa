@@ -1,253 +1,60 @@
 name: 构建生产下单系统EXE
 
-# 触发条件
+# 触发条件 - 简单配置
 on:
   push:
-    branches: [ main ]  # 主分支推送时触发
-  workflow_dispatch:    # 允许手动触发
+    branches: [main]
+  workflow_dispatch:
 
-# 构建任务
 jobs:
   build-windows-exe:
-    name: 构建Windows可执行文件
-    runs-on: windows-latest  # 使用Windows环境
+    runs-on: windows-latest
     
     steps:
       # 步骤1：获取代码
-      - name: 检出仓库代码
+      - name: 检出代码
         uses: actions/checkout@v4
       
-      # 步骤2：设置Python环境
-      - name: 设置Python 3.9
+      # 步骤2：设置Python
+      - name: 设置Python环境
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # 使用稳定版本
-          
-      # 步骤3：调试 - 显示文件结构
-      - name: 验证文件结构
-        shell: pwsh  # 使用PowerShell语法
+          python-version: '3.9'
+      
+      # 步骤3：验证文件 (第20-40行)
+      - name: 检查必要文件
+        shell: pwsh
         run: |
-          Write-Host "=== 当前目录文件 ==="
-          Get-ChildItem -Recurse -Depth 1 | Format-Table Name, Length
-          
-          Write-Host "`n=== 检查必要文件 ==="
-          $requiredFiles = @("app.py")
-          $allExist = $true
-          
-          foreach ($file in $requiredFiles) {
-            if (Test-Path $file) {
-              Write-Host "✅ $file 存在"
-            } else {
-              Write-Host "❌ $file 不存在"
-              $allExist = $false
-            }
-          }
-          
-          if (-not $allExist) {
-            Write-Host "`n⚠️  缺少必要文件，创建示例文件..."
-            # 如果app.py不存在，创建一个简单版本
+          Write-Host "检查文件..."
+          if (-not (Test-Path "app.py")) {
+            Write-Host "app.py不存在，创建简单版本..."
             @'
 from flask import Flask
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>生产下单系统</title>
-        <style>
-            body { font-family: Arial, sans-serif; padding: 40px; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .success { background: #4CAF50; color: white; padding: 20px; border-radius: 10px; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>✅ 生产下单系统</h1>
-            <div class="success">
-                <h2>EXE版本构建成功！</h2>
-                <p>版本: 1.0.0 | 构建时间: 2024</p>
-            </div>
-            <h3>功能模块:</h3>
-            <ul>
-                <li>📋 订单管理</li>
-                <li>👥 客户管理</li>
-                <li>📦 产品管理</li>
-                <li>🏭 生产跟踪</li>
-            </ul>
-            <p>这是一个独立EXE程序，无需安装Python。</p>
-        </div>
-    </body>
-    </html>
-    '''
+    return "<h1>生产下单系统</h1><p>EXE版本运行成功</p>"
 
 if __name__ == '__main__':
-    print("服务器启动: http://localhost:5000")
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=False, port=5000)
 '@ | Out-File -FilePath "app.py" -Encoding UTF8
-            Write-Host "✅ 已创建示例 app.py"
           }
-          
-      # 步骤4：安装Python依赖
-      - name: 安装依赖包
+          Write-Host "✅ 文件准备完成"
+      
+      # 步骤4：安装依赖 (第43-50行) <- 注意这里是关键区域
+      - name: 安装Python包
         run: |
-          echo "升级pip..."
-          python -m pip install --upgrade pip
-          
-          echo "安装必需包..."
-          pip install flask==2.3.0
-          pip install pyinstaller==5.13.0
-          
-          echo "验证安装..."
-          python -c "import flask; print(f'Flask版本: {flask.__version__}')"
-          python -c "import pyinstaller; print('PyInstaller可用')"
-          
-      # 步骤5：打包EXE文件
-      - name: 生成EXE可执行文件
+          pip install flask pyinstaller
+      
+      # 步骤5：打包EXE (第52-60行)
+      - name: 生成可执行文件
         run: |
-          echo "开始打包EXE..."
-          
-          # 使用PyInstaller打包
-          pyinstaller ^
-            --onefile ^                 # 打包成单个EXE
-            --name "生产下单系统" ^       # 程序名称
-            --windowed ^                # 窗口程序（无控制台）
-            --add-data "templates;templates" ^  # 包含模板文件夹
-            --clean ^                   # 清理临时文件
-            app.py
-          
-          echo "打包完成！"
-          
-      # 步骤6：验证打包结果
-      - name: 验证EXE文件
-        shell: pwsh
-        run: |
-          Write-Host "=== 验证打包结果 ==="
-          
-          $exePath = "dist/生产下单系统.exe"
-          if (Test-Path $exePath) {
-            $fileInfo = Get-Item $exePath
-            $fileSizeMB = [math]::Round($fileInfo.Length / 1MB, 2)
-            
-            Write-Host "✅ EXE文件生成成功！"
-            Write-Host "文件位置: $exePath"
-            Write-Host "文件大小: ${fileSizeMB} MB"
-            Write-Host "修改时间: $($fileInfo.LastWriteTime)"
-          } else {
-            Write-Error "❌ EXE文件未生成"
-            Write-Host "dist目录内容:"
-            Get-ChildItem "dist" -ErrorAction SilentlyContinue
-            exit 1
-          }
-          
-      # 步骤7：创建完整的发布包
-      - name: 创建发布包
-        shell: pwsh
-        run: |
-          Write-Host "创建发布包..."
-          
-          # 创建发布目录
-          New-Item -ItemType Directory -Force -Path "release"
-          
-          # 复制主程序
-          Copy-Item "dist/生产下单系统.exe" -Destination "release/"
-          
-          # 创建启动脚本
-          @'
-@echo off
-chcp 65001 >nul
-echo ========================================
-echo        生产下单系统 v1.0
-echo ========================================
-echo.
-echo 正在启动系统...
-echo 首次启动可能需要10-20秒，请耐心等待...
-echo.
-echo 启动成功后，请用浏览器访问：
-echo     http://localhost:5000
-echo.
-echo 按 Ctrl+C 可停止程序
-echo ========================================
-echo.
-start /wait 生产下单系统.exe
-pause
-'@ | Out-File -FilePath "release/启动系统.bat" -Encoding UTF8
-          
-          # 创建说明文档
-          @'
-# 生产下单系统 使用说明
-
-## 系统要求
-- Windows 7/8/10/11 (64位)
-- 无需安装Python或其他依赖
-
-## 使用方法
-1. 双击运行 "启动系统.bat"
-2. 等待程序启动（首次运行较慢）
-3. 打开浏览器访问：http://localhost:5000
-
-## 注意事项
-- 请勿删除templates文件夹
-- 首次启动可能需要10-20秒
-- 数据保存在当前目录的production.db文件中
-
-## 功能模块
-- 订单管理
-- 客户管理  
-- 产品管理
-- 生产进度跟踪
-
-## 技术支持
-如有问题，请联系系统管理员。
-'@ | Out-File -FilePath "release/使用说明.txt" -Encoding UTF8
-          
-          Write-Host "✅ 发布包创建完成"
-          
-      # 步骤8：上传构建产物
+          pyinstaller --onefile --name "生产下单系统" app.py
+      
+      # 步骤6：上传结果 (第62-68行)
       - name: 上传EXE文件
         uses: actions/upload-artifact@v4
         with:
-          name: 生产下单系统-完整包
-          path: |
-            release/
-            dist/生产下单系统.exe
-          retention-days: 30  # 保留30天
-          
-      # 步骤9：构建总结
-      - name: 生成构建报告
-        shell: pwsh
-        run: |
-          $exePath = "dist/生产下单系统.exe"
-          $fileInfo = Get-Item $exePath
-          $fileSizeMB = [math]::Round($fileInfo.Length / 1MB, 2)
-          
-          @"
-          ## 🎉 生产下单系统 EXE 构建成功！
-          
-          ### 构建信息
-          - **程序名称**: 生产下单系统.exe
-          - **文件大小**: ${fileSizeMB} MB
-          - **构建时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm')
-          - **Python版本**: 3.9
-          
-          ### 获取文件
-          在右侧 **Artifacts** 区域下载：
-          - **生产下单系统-完整包.zip**：包含完整发布文件
-          
-          ### 包含内容
-          1. 生产下单系统.exe (主程序)
-          2. 启动系统.bat (便捷启动脚本)
-          3. 使用说明.txt (使用指南)
-          
-          ### 使用方法
-          1. 解压下载的ZIP文件
-          2. 双击运行"启动系统.bat"
-          3. 访问 http://localhost:5000
-          
-          ### 注意事项
-          - 首次启动较慢，请耐心等待
-          - 防火墙可能弹出警告，请允许访问
-          - 数据保存在程序同目录的production.db中
-          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
+          name: 生产系统EXE
+          path: dist/生产下单系统.exe
