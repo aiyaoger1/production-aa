@@ -1,0 +1,58 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v3
+      
+    - name: 设置Python环境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 安装依赖
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 打包EXE文件
+      run: |
+        pyinstaller --onefile --windowed --name "生产下单系统" --add-data "templates;templates" app.py
+        
+    - name: 创建便携版包
+      run: |
+        mkdir -p 发布包
+        copy dist\生产下单系统.exe 发布包\
+        xcopy templates 发布包\templates\ /E /I
+        
+        # 创建启动脚本
+        echo @echo off > 发布包\启动系统.bat
+        echo echo 正在启动生产下单系统... >> 发布包\启动系统.bat
+        echo echo 首次启动可能需要10-20秒，请耐心等待... >> 发布包\启动系统.bat
+        echo echo 启动后请在浏览器访问: http://localhost:5000 >> 发布包\启动系统.bat
+        echo echo. >> 发布包\启动系统.bat
+        echo 生产下单系统.exe >> 发布包\启动系统.bat
+        echo pause >> 发布包\启动系统.bat
+        
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v3
+      with:
+        name: 生产下单系统-发布包
+        path: 发布包/
+        
+    - name: 生成下载链接
+      run: |
+        echo "EXE文件构建成功！" >> $GITHUB_STEP_SUMMARY
+        echo "请在右侧 Artifacts 处下载" >> $GITHUB_STEP_SUMMARY
+        echo "文件包含：" >> $GITHUB_STEP_SUMMARY
+        echo "- 生产下单系统.exe" >> $GITHUB_STEP_SUMMARY
+        echo "- templates文件夹" >> $GITHUB_STEP_SUMMARY
+        echo "- 启动系统.bat" >> $GITHUB_STEP_SUMMARY
