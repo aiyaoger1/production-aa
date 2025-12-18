@@ -14,150 +14,113 @@ jobs:
       - name: 检出仓库代码
         uses: actions/checkout@v4
       
-      # 步骤2：显示当前目录（调试用）
-      - name: 查看文件结构
-        shell: pwsh
-        run: |
-          Write-Host "=== 当前目录内容 ==="
-          Get-ChildItem
-          Write-Host ""
-      
-      # 步骤3：设置Python环境
+      # 步骤2：设置Python环境
       - name: 设置Python 3.9
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       
-      # 步骤4：安装依赖包
+      # 步骤3：安装依赖包
       - name: 安装必要包
         run: |
           python -m pip install --upgrade pip
           pip install flask==2.3.0
           pip install pyinstaller==5.13.0
       
-      # 步骤5：确保app.py存在
+      # 步骤4：确保app.py存在（修复版本）
       - name: 准备主程序文件
         shell: pwsh
         run: |
           if (-not (Test-Path "app.py")) {
             Write-Host "创建app.py文件..."
-            @'
-from flask import Flask, render_template
+            
+            # 使用Here-String创建文件内容
+            $appContent = @'
+from flask import Flask
 import os
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>生产下单系统</title>
-        <meta charset="utf-8">
-        <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            .header { background: #4CAF50; color: white; padding: 20px; border-radius: 10px; }
-            .feature { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>✅ 生产下单系统</h1>
-            <p>版本 1.0 | 独立EXE程序</p>
-        </div>
-        
-        <h2>功能模块</h2>
-        <div class="feature">
-            <h3>📋 订单管理</h3>
-            <p>创建、查看、跟踪生产订单</p>
-        </div>
-        <div class="feature">
-            <h3>👥 客户管理</h3>
-            <p>管理客户信息和联系方式</p>
-        </div>
-        <div class="feature">
-            <h3>📦 产品管理</h3>
-            <p>维护产品目录和规格</p>
-        </div>
-        <div class="feature">
-            <h3>🏭 生产跟踪</h3>
-            <p>实时跟踪订单生产进度</p>
-        </div>
-        
-        <p><strong>使用说明：</strong>所有数据保存在本地，无需网络连接。</p>
-    </body>
-    </html>
-    '''
+    return """<!DOCTYPE html>
+<html>
+<head>
+    <title>生产下单系统</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .header { background: #4CAF50; color: white; padding: 20px; border-radius: 10px; }
+        .feature { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>✅ 生产下单系统</h1>
+        <p>版本 1.0 | 独立EXE程序</p>
+    </div>
+    
+    <h2>功能模块</h2>
+    <div class="feature">
+        <h3>📋 订单管理</h3>
+        <p>创建、查看、跟踪生产订单</p>
+    </div>
+    <div class="feature">
+        <h3>👥 客户管理</h3>
+        <p>管理客户信息和联系方式</p>
+    </div>
+    <div class="feature">
+        <h3>📦 产品管理</h3>
+        <p>维护产品目录和规格</p>
+    </div>
+    <div class="feature">
+        <h3>🏭 生产跟踪</h3>
+        <p>实时跟踪订单生产进度</p>
+    </div>
+    
+    <p><strong>使用说明：</strong>所有数据保存在本地，无需网络连接。</p>
+</body>
+</html>"""
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"生产下单系统启动... 访问地址: http://localhost:{port}")
     app.run(host='0.0.0.0', port=port, debug=False)
-'@ | Out-File -FilePath "app.py" -Encoding UTF8
+'@
+            
+            Set-Content -Path "app.py" -Value $appContent -Encoding UTF8
             Write-Host "✅ app.py 已创建"
           } else {
             Write-Host "✅ app.py 已存在"
           }
       
-      # 步骤6：确保templates文件夹存在
-      - name: 准备模板文件夹
-        shell: pwsh
-        run: |
-          if (-not (Test-Path "templates")) {
-            New-Item -ItemType Directory -Force -Path "templates"
-            Write-Host "✅ templates文件夹已创建"
-          }
-          if (-not (Test-Path "templates/index.html")) {
-            @'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>生产下单系统</title>
-</head>
-<body>
-    <h1>生产下单系统模板</h1>
-    <p>这是模板文件，实际使用时会由app.py提供完整页面。</p>
-</body>
-</html>
-'@ | Out-File -FilePath "templates/index.html" -Encoding UTF8
-            Write-Host "✅ 模板文件已创建"
-          }
-      
-      # 步骤7：打包EXE文件
+      # 步骤5：打包EXE文件
       - name: 生成可执行文件
         run: |
           echo 开始打包EXE文件...
-          pyinstaller ^
-            --onefile ^
-            --name "ProductionOrderSystem" ^
-            --add-data "templates;templates" ^
-            --clean ^
-            --noconfirm ^
-            app.py
+          pyinstaller --onefile --name "生产下单系统" --clean --noconfirm app.py
           echo 打包完成！
       
-      # 步骤8：验证打包结果
-      - name: 检查EXE文件
+      # 步骤6：检查结果
+      - name: 验证EXE文件
         shell: pwsh
         run: |
-          $exePath = "dist/ProductionOrderSystem.exe"
+          $exePath = "dist/生产下单系统.exe"
           if (Test-Path $exePath) {
             $size = (Get-Item $exePath).Length / 1MB
             $sizeRounded = [math]::Round($size, 2)
             Write-Host "✅ EXE文件生成成功！"
-            Write-Host "文件路径: $exePath"
             Write-Host "文件大小: ${sizeRounded} MB"
           } else {
             Write-Error "❌ EXE文件生成失败"
             exit 1
           }
       
-      # 步骤9：创建启动脚本
+      # 步骤7：创建启动脚本
       - name: 创建启动文件
         shell: pwsh
         run: |
-          @'
+          $batchContent = @'
 @echo off
 chcp 65001 >nul
 echo ========================================
@@ -174,52 +137,18 @@ echo.
 echo 按 Ctrl+C 可停止程序
 echo ========================================
 echo.
-ProductionOrderSystem.exe
+生产下单系统.exe
 pause
-'@ | Out-File -FilePath "dist/启动系统.bat" -Encoding UTF8
+'@
           
+          Set-Content -Path "dist/启动系统.bat" -Value $batchContent -Encoding UTF8
           Write-Host "✅ 启动脚本已创建"
       
-      # 步骤10：上传构建结果
+      # 步骤8：上传结果
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: 生产下单系统-发布包
+          name: 生产下单系统
           path: |
-            dist/ProductionOrderSystem.exe
+            dist/生产下单系统.exe
             dist/启动系统.bat
-          retention-days: 30
-      
-      # 步骤11：显示成功信息
-      - name: 构建完成通知
-        shell: pwsh
-        run: |
-          $exePath = "dist/ProductionOrderSystem.exe"
-          $size = (Get-Item $exePath).Length / 1MB
-          $sizeRounded = [math]::Round($size, 2)
-          
-          @"
-          ## 🎉 生产下单系统 EXE 构建成功！
-          
-          ### 构建信息
-          - **程序名称**: ProductionOrderSystem.exe
-          - **文件大小**: ${sizeRounded} MB
-          - **构建时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-          - **Python版本**: 3.9
-          - **包含文件**: 主程序 + 启动脚本
-          
-          ### 获取文件
-          在右侧 **Artifacts** 区域下载：
-          - **生产下单系统-发布包.zip**
-          
-          ### 使用方法
-          1. 解压下载的ZIP文件
-          2. 双击运行 **启动系统.bat**
-          3. 等待程序启动（首次运行较慢）
-          4. 打开浏览器访问 **http://localhost:5000**
-          
-          ### 注意事项
-          - 防火墙可能弹出警告，请允许访问
-          - 首次启动需要时间，请耐心等待
-          - 程序完全独立，无需安装Python
-          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY
